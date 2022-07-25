@@ -242,6 +242,10 @@ class Check(models.Model):
     def channels_str(self):
         """Return a comma-separated string of assigned channel codes."""
 
+        # Is this an unsaved instance?
+        if not self.id:
+            return ""
+
         # self.channel_set may already be prefetched.
         # Sort in python to make sure we do't run additional queries
         codes = [str(channel.code) for channel in self.channel_set.all()]
@@ -307,6 +311,8 @@ class Check(models.Model):
             # Don't update "last_ping" field.
         elif action == "ign":
             pass
+        elif action == "log":
+            pass
         else:
             self.last_ping = frozen_now
             if self.last_start:
@@ -334,7 +340,7 @@ class Check(models.Model):
         ping = Ping(owner=self)
         ping.n = self.n_pings
         ping.created = frozen_now
-        if action in ("start", "fail", "ign"):
+        if action in ("start", "fail", "ign", "log"):
             ping.kind = action
 
         ping.remote_addr = remote_addr

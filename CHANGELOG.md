@@ -10,9 +10,12 @@ All notable changes to this project will be documented in this file.
 - Upgrade to cron-descriptor 1.2.30
 - Add "Filter by keywords in the message body" feature (#653)
 - Upgrade to HiDPI screenshots in the documentation
+- Add support for the $JSON placeholder in webhook payloads
+- Add ping endpoints for "log" events
 
 ### Bug Fixes
 - Fix the display of ignored pings with non-zero exit status
+- Fix a race condition in the "Change Email" flow
 
 ## v2.2.1 - 2022-06-13
 
