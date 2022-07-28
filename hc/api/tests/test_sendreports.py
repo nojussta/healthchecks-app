@@ -6,8 +6,30 @@ from django.utils.timezone import now
 from hc.api.management.commands.sendreports import Command
 from hc.api.models import Check
 from hc.test import BaseTestCase
+from django.test.utils import override_settings
+
+NAG_TEXT = """Hello,
+
+This is a hourly reminder sent by Mychecks.
+
+One check is currently DOWN.
 
 
+Alices Project
+==============
+
+Status Name                                     Last Ping
+------ ---------------------------------------- ----------------------
+DOWN   Foo                                      now
+
+
+--
+Cheers,
+Mychecks
+"""
+
+
+@override_settings(SITE_NAME="Mychecks")
 class SendReportsTestCase(BaseTestCase):
     def setUp(self):
         super().setUp()
@@ -28,6 +50,7 @@ class SendReportsTestCase(BaseTestCase):
 
         # And it needs at least one check that has been pinged.
         self.check = Check(project=self.project, last_ping=now())
+        self.check.name = "Foo"
         self.check.status = "down"
         self.check.save()
 
@@ -113,6 +136,8 @@ class SendReportsTestCase(BaseTestCase):
         html = email.alternatives[0][0]
         self.assertNotIn(str(self.check.code), email.body)
         self.assertNotIn(str(self.check.code), html)
+
+        self.assertEqual(email.body, NAG_TEXT)
 
     def test_it_obeys_next_nag_date(self):
         self.profile.next_nag_date = now() + td(days=1)

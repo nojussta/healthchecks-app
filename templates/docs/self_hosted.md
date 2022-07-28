@@ -101,7 +101,7 @@ EMAIL_USE_TLS = True
 ```
 
 You can read more about handling outbound email in the Django documentation,
-[Sending Email](https://docs.djangoproject.com/en/3.1/topics/email/) section.
+[Sending Email](https://docs.djangoproject.com/en/4.0/topics/email/) section.
 
 ## Receiving Emails
 
@@ -137,7 +137,7 @@ server restarts.
 
 ## Database Cleanup
 
-With time and use the Healthchecks database will grow in size. You may
+With time and use, the Healthchecks database will grow in size. You may
 decide to prune old data: inactive user accounts, old checks not assigned
 to users, old records of outgoing email messages. There are separate Django management
 commands for each task:
