@@ -4,9 +4,10 @@ Supports only a tiny subset of jsonschema.
 
 """
 
-from croniter import croniter
-from six import string_types
-from pytz import all_timezones
+from datetime import datetime
+
+from cronsim import CronSim
+from hc.lib.tz import all_timezones
 
 
 class ValidationError(Exception):
@@ -15,16 +16,24 @@ class ValidationError(Exception):
 
 def validate(obj, schema, obj_name="value"):
     if schema.get("type") == "string":
-        if not isinstance(obj, string_types):
+        if not isinstance(obj, str):
             raise ValidationError("%s is not a string" % obj_name)
+        if "minLength" in schema and len(obj) < schema["minLength"]:
+            raise ValidationError("%s is too short" % obj_name)
         if "maxLength" in schema and len(obj) > schema["maxLength"]:
             raise ValidationError("%s is too long" % obj_name)
         if schema.get("format") == "cron":
             try:
-                croniter(obj)
+                # Does it have 5 components?
+                if len(obj.split()) != 5:
+                    raise ValueError()
+
+                # Does cronsim accept the schedule?
+                it = CronSim(obj, datetime(2000, 1, 1))
+                # Can it calculate the next datetime?
+                next(it)
             except:
-                raise ValidationError(
-                    "%s is not a valid cron expression" % obj_name)
+                raise ValidationError("%s is not a valid cron expression" % obj_name)
         if schema.get("format") == "timezone" and obj not in all_timezones:
             raise ValidationError("%s is not a valid timezone" % obj_name)
 
@@ -35,6 +44,10 @@ def validate(obj, schema, obj_name="value"):
             raise ValidationError("%s is too small" % obj_name)
         if "maximum" in schema and obj > schema["maximum"]:
             raise ValidationError("%s is too large" % obj_name)
+
+    elif schema.get("type") == "boolean":
+        if not isinstance(obj, bool):
+            raise ValidationError("%s is not a boolean" % obj_name)
 
     elif schema.get("type") == "array":
         if not isinstance(obj, list):

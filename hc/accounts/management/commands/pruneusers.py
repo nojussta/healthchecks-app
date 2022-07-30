@@ -2,40 +2,42 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
-from django.db.models import Count
-from django.utils import timezone
+from django.db.models import Count, F
+from django.utils.timezone import now
+from hc.accounts.models import Profile
 
 
 class Command(BaseCommand):
     help = """Prune old, inactive user accounts.
 
     Conditions for removing an user account:
-        - created 6 months ago and never logged in. Does not belong
+        - created 1 month ago and never logged in. Does not belong
           to any team.
           Use case: visitor types in their email at the website but
           never follows through with login.
 
-        - not logged in for 6 months, and has no checks. Does not
-          belong to any team.
-          Use case: user wants to remove their account. So they
-          remove all checks and leave the account at that.
-
     """
 
     def handle(self, *args, **options):
-        cutoff = timezone.now() - timedelta(days=180)
+        month_ago = now() - timedelta(days=30)
 
         # Old accounts, never logged in, no team memberships
-        q = User.objects
+        q = User.objects.order_by("id")
         q = q.annotate(n_teams=Count("memberships"))
-        q = q.filter(date_joined__lt=cutoff, last_login=None, n_teams=0)
-        n1, _ = q.delete()
+        q = q.filter(date_joined__lt=month_ago, last_login=None, n_teams=0)
 
-        # Not logged in for 1 month, 0 checks, no team memberships
-        q = User.objects
-        q = q.annotate(n_checks=Count("check"))
-        q = q.annotate(n_teams=Count("memberships"))
-        q = q.filter(last_login__lt=cutoff, n_checks=0, n_teams=0)
-        n2, _ = q.delete()
+        n, summary = q.delete()
+        count = summary.get("auth.User", 0)
+        self.stdout.write("Pruned %d never-logged-in user accounts." % count)
 
-        return "Done! Pruned %d user accounts." % (n1 + n2)
+        # Profiles scheduled for deletion
+        q = Profile.objects.order_by("id")
+        q = q.filter(deletion_notice_date__lt=month_ago)
+        # Exclude users who have logged in after receiving deletion notice
+        q = q.exclude(user__last_login__gt=F("deletion_notice_date"))
+
+        for profile in q:
+            self.stdout.write("Deleting inactive %s" % profile.user.email)
+            profile.user.delete()
+
+        return "Done!"

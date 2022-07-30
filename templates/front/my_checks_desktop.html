@@ -1,125 +1,145 @@
-{% load hc_extras %}
-<table id="checks-table" class="table hidden-xs">
+{% load hc_extras static %}
+<table
+    id="checks-table"
+    class="table {% if rw %}rw{% endif%}"
+    data-list-url="{% url 'hc-checks' project.code %}"
+    data-status-url="{% url 'hc-status' project.code %}">
     <tr>
         <th></th>
         <th class="th-name">
             {% if sort == "name" %}
-            <a href="?sort=-name">Name<span class="icon-asc"></span></a>
+            <a href="?sort=-name" data-toggle="tooltip" class="sort-name">
+                Name<span class="ic-asc"></span>
+            </a>
             {% elif sort == "-name" %}
-            <a href="?sort=created">Name<span class="icon-desc"></span></a>
+            <a href="?sort=created" data-toggle="tooltip" class="sort-name">
+                Name<span class="ic-desc"></span>
+            </a>
             {% else %}
-            <a href="?sort=name" class="default">Name</span></a>
+            <a href="?sort=name" data-toggle="tooltip" class="default sort-name">
+                Name
+            </a>
             {% endif %}
         </th>
-        <th>Ping URL</th>
-        <th class="th-period">
+        <th class="hidden-xs hidden-sm">
+            <span class="visible-lg-inline">
+                Ping URL
+            </span>
+            <span class="visible-md-inline">{{ project.show_slugs|yesno:"Key/Slug,UUID" }}</span>
+            {% if rw %}
+            <small id="url-style-switcher">
+                <a href="?urls=uuid" {% if not project.show_slugs %}class="active"{% endif %}>uuid</a>
+                <a href="?urls=slug" {% if project.show_slugs %}class="active"{% endif %}>slug</a>
+            </small>
+            {% endif %}
+        </th>
+        <th class="th-integrations hidden-xs">Integrations</th>
+        <th class="th-period hidden-xs">
             Period <br />
             <span class="checks-subline">Grace</span>
         </th>
-        <th class="th-last-ping">
+        <th class="th-last-ping hidden-xs">
             {% if sort == "last_ping" %}
-            <a href="?sort=created">Last Ping<span class="icon-desc"></span></a>
+            <a href="?sort=created" data-toggle="tooltip" class="sort-last-ping">
+                Last Ping<span class="ic-desc"></span>
+            </a>
             {% elif sort == "-last_ping" %}
-            <a href="?sort=last_ping">Last Ping<span class="icon-asc"></span></a>
+            <a href="?sort=last_ping" data-toggle="tooltip" class="sort-last-ping">
+                Last Ping<span class="ic-asc"></span>
+            </a>
             {% else %}
-            <a href="?sort=-last_ping" class="default">Last Ping</span></a>
+            <a href="?sort=-last_ping" data-toggle="tooltip" class="default sort-last-ping">
+                Last Ping
+            </a>
+            {% endif %}
+            {% if show_last_duration %}
+            <br />
+            <span class="checks-subline">Last Duration</span>
             {% endif %}
         </th>
         <th></th>
     </tr>
-    {% for check in checks|sortchecks:sort %}
-    <tr class="checks-row">
+    {% for check in checks %}
+    <tr id="{{ check.code }}" class="checks-row" {% if check in hidden_checks %}style="display: none"{% endif %}>
         <td class="indicator-cell">
-            {% if check.in_grace_period %}
-                <span id="si-{{ check.code }}" class="status icon-grace" data-toggle="tooltip"></span>
-            {% else %}
-                <span id="si-{{ check.code }}" class="status icon-{{ check.get_status }}" data-toggle="tooltip"></span>
-            {% endif %}
+            <span class="status ic-{{ check.get_status }}" data-toggle="tooltip"></span>
+            <div class="spinner {% if check.last_start %}started{% endif %}"></div>
         </td>
-        <td class="name-cell">
+        <td>
             <div data-name="{{ check.name }}"
-                    data-tags="{{ check.tags }}"
-                    data-url="{% url 'hc-update-name' check.code %}"
-                    class="my-checks-name {% if not check.name %}unnamed{% endif %}">
-                <div>{{ check.name|default:"unnamed" }}</div>
+                 data-tags="{{ check.tags }}"
+                 data-desc="{{ check.desc }}"
+                 class="my-checks-name {% if not check.name %}unnamed{% endif %}">
+                <div>{{ check.name|default:"unnamed"|break_underscore }}</div>
                 {% for tag in check.tags_list %}
                 <span class="label label-tag">{{ tag }}</span>
                 {% endfor %}
             </div>
         </td>
-        <td class="url-cell">
-            <span class="my-checks-url">
-                <span class="base">{{ ping_endpoint }}</span>{{ check.code }}
-            </span>
-            <button
-                class="copy-link hidden-sm"
-                data-clipboard-text="{{ check.url }}">
-                copy
-            </button>
+        <td class="hidden-xs hidden-sm url">
+            {% if project.show_slugs and not check.slug %}
+                <span class="unavailable">unavailable, set name first</span>
+            {% else %}
+                <span class="my-checks-url">{{ check.url|format_ping_endpoint }}</span>
+                {% if project.show_slugs and check.slug in ambiguous %}
+                <small class="text-danger">(not unique)</small>
+                {% endif %}
+                <button class="copy-link" data-clipboard-text="{{ check.url }}">copy</button>
+            {% endif %}
         </td>
-        <td class="timeout-cell">
-            <span
-                data-url="{% url 'hc-update-timeout' check.code %}"
+        <td class="hidden-xs">
+            {% if channels|length <= 10 %}
+                <div class="integrations">
+                {% spaceless %}
+                {% for channel in channels %}
+                    <span class="ic-{{ channel.kind }}{% if channel in check.channel_set.all %}{% else %} off{% endif %}"></span>
+                {% endfor %}
+                {% endspaceless %}
+                </div>
+            {% else %}
+                {{ check.channel_set.all|length }} of {{ channels|length }}
+            {% endif %}
+        </td>
+        <td class="hidden-xs">
+            <div class="timeout-grace"
                 data-kind="{{ check.kind }}"
-                data-timeout="{{ check.timeout.total_seconds }}"
-                data-grace="{{ check.grace.total_seconds }}"
+                data-timeout="{{ check.timeout.total_seconds|floatformat:'0' }}"
+                data-grace="{{ check.grace.total_seconds|floatformat:'0' }}"
                 data-schedule="{{ check.schedule }}"
-                data-tz="{{ check.tz }}"
-                class="timeout-grace">
+                data-tz="{{ check.tz }}">
                 {% if check.kind == "simple" %}
                     {{ check.timeout|hc_duration }}
+                    <br />
                 {% elif check.kind == "cron" %}
-                    <span class="cron-expression">{{ check.schedule }}</span>
+                    <div class="cron-expression">{{ check.schedule }}</div>
                 {% endif %}
-                <br />
                 <span class="checks-subline">
                 {{ check.grace|hc_duration }}
                 </span>
-            </span>
-        </td>
-        <td id="lpd-{{ check.code}}" class="last-ping-cell">
-            {% include "front/last_ping_cell.html" with check=check %}
-        </td>
-        <td>
-            <div class="check-menu dropdown">
-                <button class="btn btn-sm btn-default dropdown-toggle" type="button" data-toggle="dropdown">
-                <span class="icon-settings" aria-hidden="true"></span>
-                </button>
-                <ul class="dropdown-menu">
-                    <li id="pause-li-{{ check.code }}" {% if check.status == "new" or check.status == "paused" %}class="disabled"{% endif %}>
-                        <a class="pause-check"
-                           href="#"
-                           data-url="{% url 'hc-pause' check.code %}">
-                           Pause Monitoring
-                        </a>
-                    </li>
-                    <li role="separator" class="divider"></li>
-                    <li>
-                        <a href="{% url 'hc-log' check.code %}">
-                            Log
-                        </a>
-                    </li>
-                    <li>
-                        <a
-                            href="#"
-                            class="usage-examples"
-                            data-url="{{ check.url }}"
-                            data-email="{{ check.email }}">
-                            Usage Examples
-                        </a>
-                    </li>
-                    <li role="separator" class="divider"></li>
-                    <li>
-                        <a href="#" class="check-menu-remove"
-                            data-name="{{ check.name_then_code }}"
-                            data-url="{% url 'hc-remove-check' check.code %}">
-                            Remove
-                        </a>
-                    </li>
-                </ul>
             </div>
+        </td>
+        <td class="hidden-xs">
+            <div class="last-ping">{% include "front/last_ping_cell.html" with check=check %}</div>
+        </td>
+        <td class="actions">
+            {% if rw %}
+            <button class="btn btn-default pause" type="button">
+                <span class="ic-paused"></span>
+            </button>
+            {% endif %}
+            <button title="Show Details" class="btn btn-default show-log" type="button">
+                <span class="ic-dots"></span>
+            </button>
         </td>
     </tr>
     {% endfor %}
 
 </table>
+
+{% for channel in channels %}
+<div
+    id="ch-{{ forloop.counter0}}"
+    data-code="{{ channel.code }}"
+    data-title="{{ channel }}">
+</div>
+{% endfor %}

@@ -11,38 +11,50 @@
     padding-bottom: 24px;
 }
 
-#badges-description, #b-format {
-    margin-bottom: 24px;
-}
-
-.page-profile .icon-ok {
+.page-project .ic-ok {
     color: #5cb85c;
 }
 
-#close-account {
+#close-account, #remove-project {
     margin-left: 24px;
     border-color: #d43f3a;
-    color: #d43f3a;
+    color: var(--btn-remove-color);
+    background-color:  var(--btn-remove-bg);
 }
 
-#close-account:hover {
-    background-color: #ffebea;
+#close-account:hover, #remove-project:hover {
+    background-color: var(--btn-remove-hover);
 }
 
-.table td.overall-status {
+.invite-suggestion {
+    color: var(--text-muted);
+}
+
+#suggestions-row td {
+    border-top: 0;
+    font-size: 85%;
+    padding-top: 20px;
+}
+
+#team-table th {
     border-top: 0;
 }
 
-.table td.have-tags {
-    padding-top: 32px;
+#team-table .email {
+    max-width: 340px;
+    word-wrap: break-word;
+
 }
 
-#badges-json {
-    display: none;
+.page-project .panel-footer {
+    max-width: 100%;
+    word-wrap: break-word;
 }
 
-.json-response code {
-    display: inline-block;
-    background: #eee;
-    padding: 3px;
+#transfer-request {
+    border: 5px solid #ffdc3e;
+}
+
+#transfer-request .settings-block {
+    padding: 20px;
 }

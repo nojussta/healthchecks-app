@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% load staticfiles compress hc_extras %}
+{% load hc_extras %}
 
-{% block title %}Pricing - {% site_name %}{% endblock %}
+{% block title %}Pricing - {{ site_name }}{% endblock %}
 
 {% block content %}
 
@@ -11,19 +11,15 @@
             <div class="col-md-12">
                 <div class="jumbotron">
                     <p>
-                        You are currently viewing team <strong>{{ request.team }}</strong>.
+                        You are currently viewing project <strong>{{ project }}</strong>.
                     </p>
                     <p>
-                        To manage this team, please log in as <strong>{{ request.team.user.email }}</strong>.
+                        To manage billing for this project, please log in as <strong>{{ project.owner.email }}</strong>.
                     </p>
 
                     <br />
 
                     <p>
-                        <a class="btn btn-default"
-                           href="{% url 'hc-switch-team' request.user.username %}">
-                           Switch to {{ request.profile }}
-                       </a>
                         <a class="btn btn-default" href="{% url 'hc-logout' %}">Log Out</a>
                     </p>
                 </div>

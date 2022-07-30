@@ -1,36 +1,40 @@
-from django.conf.urls import url
+from django.urls import path
 from hc.accounts import views
 
 urlpatterns = [
-    url(r'^login/$', views.login, name="hc-login"),
-    url(r'^logout/$', views.logout, name="hc-logout"),
-    url(r'^login_link_sent/$',
-        views.login_link_sent, name="hc-login-link-sent"),
-
-    url(r'^link_sent/$',
-        views.link_sent, name="hc-link-sent"),
-
-    url(r'^check_token/([\w-]+)/([\w-]+)/$',
-        views.check_token, name="hc-check-token"),
-
-    url(r'^profile/$', views.profile, name="hc-profile"),
-    url(r'^profile/notifications/$', views.notifications, name="hc-notifications"),
-    url(r'^profile/badges/$', views.badges, name="hc-badges"),
-    url(r'^close/$', views.close, name="hc-close"),
-
-    url(r'^unsubscribe_reports/([\w\:-]+)/$',
-        views.unsubscribe_reports, name="hc-unsubscribe-reports"),
-
-    url(r'^set_password/([\w-]+)/$',
-        views.set_password, name="hc-set-password"),
-
-    url(r'^change_email/done/$',
-        views.change_email_done, name="hc-change-email-done"),
-
-    url(r'^change_email/([\w-]+)/$',
-        views.change_email, name="hc-change-email"),
-
-   url(r'^switch_team/([\w-]+)/$',
-        views.switch_team, name="hc-switch-team"),
-
+    path("login/", views.login, name="hc-login"),
+    path("login/two_factor/", views.login_webauthn, name="hc-login-webauthn"),
+    path("login/two_factor/totp/", views.login_totp, name="hc-login-totp"),
+    path("logout/", views.logout, name="hc-logout"),
+    path("signup/", views.signup, name="hc-signup"),
+    path("login_link_sent/", views.login_link_sent, name="hc-login-link-sent"),
+    path(
+        "check_token/<slug:username>/<str:token>/",
+        views.check_token,
+        name="hc-check-token",
+    ),
+    path("profile/", views.profile, name="hc-profile"),
+    path("profile/appearance/", views.appearance, name="hc-appearance"),
+    path("profile/notifications/", views.notifications, name="hc-notifications"),
+    path("close/", views.close, name="hc-close"),
+    path(
+        "unsubscribe_reports/<str:signed_username>/",
+        views.unsubscribe_reports,
+        name="hc-unsubscribe-reports",
+    ),
+    path("set_password/", views.set_password, name="hc-set-password"),
+    path("change_email/", views.change_email, name="hc-change-email"),
+    path(
+        "change_email/<str:signed_payload>/",
+        views.change_email_verify,
+        name="hc-change-email-verify",
+    ),
+    path("two_factor/webauthn/", views.add_webauthn, name="hc-add-webauthn"),
+    path("two_factor/totp/", views.add_totp, name="hc-add-totp"),
+    path("two_factor/totp/remove/", views.remove_totp, name="hc-remove-totp"),
+    path(
+        "two_factor/<uuid:code>/remove/",
+        views.remove_credential,
+        name="hc-remove-credential",
+    ),
 ]

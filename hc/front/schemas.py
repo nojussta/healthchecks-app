@@ -8,16 +8,16 @@ telegram_callback = {
                     "type": "object",
                     "properties": {
                         "id": {"type": "number"},
-                        "type": {"enum": ["group", "private", "supergroup"]},
+                        "type": {"enum": ["group", "private", "supergroup", "channel"]},
                         "title": {"type": "string"},
-                        "username": {"type": "string"}
+                        "username": {"type": "string"},
                     },
-                    "required": ["id", "type"]
+                    "required": ["id", "type"],
                 },
-                "text": {"type": "string"}
+                "text": {"type": "string"},
             },
-            "required": ["chat", "text"]
+            "required": ["chat", "text"],
         }
     },
-    "required": ["message"]
+    "required": ["message"],
 }

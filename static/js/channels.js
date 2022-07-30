@@ -1,29 +1,11 @@
 $(function() {
-    var placeholders = {
-        email: "address@example.org",
-        webhook: "http://",
-        slack: "https://hooks.slack.com/...",
-        hipchat: "https://api.hipchat.com/...",
-        pd: "service key"
-    }
 
-    $("#add-channel-kind").change(function() {
-        $(".channels-add-help p").hide();
-
-        var v = $("#add-channel-kind").val();
-        $(".channels-add-help p." + v).show();
-
-        $("#add-channel-value").attr("placeholder", placeholders[v]);
-    });
-
-    $(".edit-checks").click(function() {
+    $(".rw .edit-checks").click(function() {
         $("#checks-modal").modal("show");
-        var url = $(this).attr("href");
-        $.ajax(url).done(function(data) {
+        $.ajax(this.dataset.url).done(function(data) {
             $("#checks-modal .modal-content").html(data);
 
         })
-
 
         return false;
     });
@@ -43,6 +25,10 @@ $(function() {
 
         return false;
     });
+
+    $(".channel-modal").on('shown.bs.modal', function () {
+        $(".input-name", this).focus();
+    })
 
     $('[data-toggle="tooltip"]').tooltip();
 

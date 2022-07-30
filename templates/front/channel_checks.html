@@ -1,11 +1,11 @@
-{% load compress humanize staticfiles hc_extras %}
+{% load humanize hc_extras %}
 
 <form method="post">
 {% csrf_token %}
 
 <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal">&times;</button>
-    <h4 class="update-timeout-title">Assign Checks to Channel</h4>
+    <h4>Assign Checks to Integration</h4>
 </div>
 
 <input type="hidden" name="channel" value="{{ channel.code }}" />

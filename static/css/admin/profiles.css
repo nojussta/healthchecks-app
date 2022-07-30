@@ -1,30 +1,16 @@
-.field-users ul {
+.field-projects ul {
     list-style: none;
     margin: 0;
     padding: 0;
-    color: #888;
 }
 
-.field-users ul li {
+.field-projects ul li {
     list-style-type: none;
 }
 
-.field-checks {
-    color: #888;
+td.field-email span {
+    color: #555;
+    background: #EEE;
+    padding: 1px 4px;
+    border-radius: 2px;
 }
-
-.bar {
-    display: inline-block;
-    width: 100px;
-    height: 10px;
-    border-radius: 5px;
-    overflow: hidden;
-    background: #ddd;
-}
-
-.bar span {
-    display: block;
-    height: 10px;
-    background: #79aec8;
-}
-
