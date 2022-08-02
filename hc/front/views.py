@@ -34,6 +34,7 @@ from hc.api.models import (
     MAX_DELTA,
     Channel,
     Check,
+    Flip,
     Ping,
     Notification,
 )
@@ -165,6 +166,13 @@ def _refresh_last_active_date(profile):
     if profile.last_active_date is None or (now() - profile.last_active_date).days > 0:
         profile.last_active_date = now()
         profile.save()
+
+
+def _get_referer_qs(request):
+    parsed = urlparse(request.META.get("HTTP_REFERER", ""))
+    if parsed.query:
+        return "?" + parsed.query
+    return ""
 
 
 @login_required
@@ -387,6 +395,7 @@ def add_check(request, code):
     check.assign_all_channels()
 
     url = reverse("hc-checks", args=[project.code])
+    url += _get_referer_qs(request)  # Preserve selected tags and search
     return redirect(url)
 
 
@@ -405,7 +414,9 @@ def update_name(request, code):
     if "/details/" in request.META.get("HTTP_REFERER", ""):
         return redirect("hc-details", code)
 
-    return redirect("hc-checks", check.project.code)
+    url = reverse("hc-checks", args=[check.project.code])
+    url += _get_referer_qs(request)  # Preserve selected tags and search
+    return redirect(url)
 
 
 @require_POST
@@ -456,8 +467,21 @@ def update_timeout(request, code):
         # Checks can flip from "up" to "down" state as a result of changing check's
         # schedule.  We don't want to send notifications when changing schedule
         # interactively in the web UI. So we update the `alert_after` and `status`
-        # fields here the same way as `sendalerts` would do, but without sending
-        # an actual alert:
+        # fields, and create a Flip object here the same way as `sendalerts` would do,
+        # but without sending an actual alert.
+        #
+        # We need to create the Flip object because otherwise the calculation
+        # in Check.downtimes() will come out wrong (when this check later comes up,
+        # we will have no record of when it went down).
+
+        flip = Flip(owner=check)
+        flip.created = now()
+        # mark as processed, don't want sendalerts to process this!
+        flip.processed = flip.created
+        flip.old_status = check.status
+        flip.new_status = "down"
+        flip.save()
+
         check.alert_after = None
         check.status = "down"
 
@@ -466,7 +490,9 @@ def update_timeout(request, code):
     if "/details/" in request.META.get("HTTP_REFERER", ""):
         return redirect("hc-details", code)
 
-    return redirect("hc-checks", check.project.code)
+    url = reverse("hc-checks", args=[check.project.code])
+    url += _get_referer_qs(request)  # Preserve selected tags and search
+    return redirect(url)
 
 
 @require_POST
