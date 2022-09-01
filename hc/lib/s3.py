@@ -1,5 +1,6 @@
 from io import BytesIO
 from threading import Thread
+import time
 
 from django.conf import settings
 
@@ -7,6 +8,7 @@ try:
     from minio import Minio, S3Error
     from minio.deleteobjects import DeleteObject
     from urllib3 import PoolManager
+    from urllib3.exceptions import ReadTimeoutError
 except ImportError:
     # Enforce
     settings.S3_BUCKET = None
@@ -36,7 +38,7 @@ ASCII_Z = ord("z")
 
 
 def enc(n):
-    """Generates an object key in the "<sorting prefix>-<n>" form.
+    """Generate an object key in the "<sorting prefix>-<n>" form.
 
     >>> [enc(i) for i in range(0, 5)]
     ['zj-0', 'zi-1', 'zh-2', 'zg-3', 'zf-4']
@@ -52,9 +54,7 @@ def enc(n):
     retrieves all keys at bucket's root directory with n < 123:
 
     >>> client.list_objects(bucket_name, start_after=enc(123))
-
     """
-
     s = str(n)
     len_inverted = chr(ASCII_Z - len(s) + 1)
     inverted = "".join(chr(ASCII_J - int(c)) for c in s)
@@ -103,17 +103,22 @@ def _remove_objects(code, upto_n):
     q = client().list_objects(settings.S3_BUCKET, prefix, start_after=start_after)
     delete_objs = [DeleteObject(obj.object_name) for obj in q]
     if delete_objs:
-        errors = client().remove_objects(settings.S3_BUCKET, delete_objs)
-        for e in errors:
-            print("remove_objects error: ", e)
+        num_objs = len(delete_objs)
+        try:
+            start = time.time()
+            errors = client().remove_objects(settings.S3_BUCKET, delete_objs)
+            for e in errors:
+                print("remove_objects error: ", e)
+            total = time.time() - start
+            print("remove_objects for %d objects took %.1fs" % (num_objs, total))
+        except ReadTimeoutError:
+            print("remove_objects timed out for %d objects" % num_objs)
 
 
 def remove_objects(check_code, upto_n):
-    """Removes keys with n values below or equal to `upto_n`.
+    """Remove keys with n values below or equal to `upto_n`.
 
     The S3 API calls can take seconds to complete,
     therefore run the removal code on thread.
-
     """
-
     Thread(target=_remove_objects, args=(check_code, upto_n)).start()

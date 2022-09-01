@@ -3,6 +3,7 @@ import random
 from secrets import token_urlsafe
 from urllib.parse import quote, urlencode
 import uuid
+import sys
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
@@ -15,9 +16,9 @@ from django.utils.timezone import now
 from hc.lib import emails
 from hc.lib.date import month_boundaries
 
-try:
+if sys.version_info >= (3, 9):
     from zoneinfo import ZoneInfo
-except ImportError:
+else:
     from backports.zoneinfo import ZoneInfo
 
 
@@ -175,7 +176,11 @@ class Profile(models.Model):
         return q.distinct().order_by("name")
 
     def annotated_projects(self):
-        """Return all projects, annotated with 'n_down'."""
+        """Return all projects, annotated with 'n_down'.
+
+        Used to render the projects list in the navbar / "Account" menu.
+
+        """
 
         # Subquery for getting project ids
         project_ids = self.projects().values("id")
@@ -191,11 +196,9 @@ class Profile(models.Model):
     def checks_from_all_projects(self):
         """Return a queryset of checks from projects we have access to."""
 
-        project_ids = self.projects().values("id")
-
         from hc.api.models import Check
 
-        return Check.objects.filter(project_id__in=project_ids)
+        return Check.objects.filter(project__in=self.projects())
 
     def send_report(self, nag=False):
         checks = self.checks_from_all_projects()
@@ -393,19 +396,6 @@ class Project(models.Model):
 
         for profile in q:
             profile.update_next_nag_date()
-
-    def overall_status(self):
-        if not hasattr(self, "_overall_status"):
-            self._overall_status = "up"
-            for check in self.check_set.all():
-                check_status = check.get_status()
-                if check_status == "grace" and self._overall_status == "up":
-                    self._overall_status = "grace"
-                elif check_status == "down":
-                    self._overall_status = "down"
-                    break
-
-        return self._overall_status
 
     def get_n_down(self):
         result = 0

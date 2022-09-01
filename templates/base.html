@@ -52,6 +52,7 @@
     <link rel="stylesheet" href="{% static 'css/profile.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/projects.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/radio.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'css/search.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/settings.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/snippet-copy.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/syntax.css' %}" type="text/css">
@@ -187,9 +188,10 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{% url 'hc-logout' %}">
-                            {% trans "Log Out" %}
-                        </a>
+                        <form method="post" action="{% url 'hc-logout' %}">
+                            {% csrf_token %}
+                            <button class="btn btn-link" type="submit">{% trans "Log Out" %}</button>
+                        </form>
                     </li>
                     </ul>
                 </li>

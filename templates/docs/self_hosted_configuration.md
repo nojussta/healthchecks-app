@@ -1,7 +1,86 @@
 # Server Configuration
 
 Healthchecks prepares its configuration in `hc/settings.py`. It reads configuration
-from environment variables. Below is a list of variables it reads and uses:
+from environment variables. Below is a list of variables it reads and uses.
+
+<ul class="self-hosted-configuration-toc">
+<li><a href="#ALLOWED_HOSTS">ALLOWED_HOSTS</a></li>
+<li><a href="#APPRISE_ENABLED">APPRISE_ENABLED</a></li>
+<li><a href="#DB">DB</a></li>
+<li><a href="#DB_CONN_MAX_AGE">DB_CONN_MAX_AGE</a></li>
+<li><a href="#DB_HOST">DB_HOST</a></li>
+<li><a href="#DB_NAME">DB_NAME</a></li>
+<li><a href="#DB_PASSWORD">DB_PASSWORD</a></li>
+<li><a href="#DB_PORT">DB_PORT</a></li>
+<li><a href="#DB_SSLMODE">DB_SSLMODE</a></li>
+<li><a href="#DB_TARGET_SESSION_ATTRS">DB_TARGET_SESSION_ATTRS</a></li>
+<li><a href="#DB_USER">DB_USER</a></li>
+<li><a href="#DEBUG">DEBUG</a></li>
+<li><a href="#DEFAULT_FROM_EMAIL">DEFAULT_FROM_EMAIL</a></li>
+<li><a href="#DISCORD_CLIENT_ID">DISCORD_CLIENT_ID</a></li>
+<li><a href="#DISCORD_CLIENT_SECRET">DISCORD_CLIENT_SECRET</a></li>
+<li><a href="#EMAIL_HOST">EMAIL_HOST</a></li>
+<li><a href="#EMAIL_HOST_PASSWORD">EMAIL_HOST_PASSWORD</a></li>
+<li><a href="#EMAIL_HOST_USER">EMAIL_HOST_USER</a></li>
+<li><a href="#EMAIL_PORT">EMAIL_PORT</a></li>
+<li><a href="#EMAIL_USE_TLS">EMAIL_USE_TLS</a></li>
+<li><a href="#EMAIL_USE_SSL">EMAIL_USE_SSL</a></li>
+<li><a href="#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a></li>
+<li><a href="#http_proxy">http_proxy and https_proxy</a></li>
+<li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
+<li><a href="#LINENOTIFY_CLIENT_ID">LINENOTIFY_CLIENT_ID</a></li>
+<li><a href="#LINENOTIFY_CLIENT_SECRET">LINENOTIFY_CLIENT_SECRET</a></li>
+<li><a href="#MASTER_BADGE_URL">MASTER_BADGE_LABEL</a></li>
+<li><a href="#MATRIX_ACCESS_TOKEN">MATRIX_ACCESS_TOKEN</a></li>
+<li><a href="#MATRIX_HOMESERVER">MATRIX_HOMESERVER</a></li>
+<li><a href="#MATRIX_USER_ID">MATRIX_USER_ID</a></li>
+<li><a href="#MATTERMOST_ENABLED">MATTERMOST_ENABLED</a></li>
+<li><a href="#MSTEAMS_ENABLED">MSTEAMS_ENABLED</a></li>
+<li><a href="#OPSGENIE_ENABLED">OPSGENIE_ENABLED</a></li>
+<li><a href="#PAGERTREE_ENABLED">PAGERTREE_ENABLED</a></li>
+<li><a href="#PD_APP_ID">PD_APP_ID</a></li>
+<li><a href="#PD_ENABLED">PD_ENABLED</a></li>
+<li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
+<li><a href="#PING_EMAIL_DOMAIN">PING_EMAIL_DOMAIN</a></li>
+<li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
+<li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
+<li><a href="#PUSHBULLET_CLIENT_ID">PUSHBULLET_CLIENT_ID</a></li>
+<li><a href="#PUSHBULLET_CLIENT_SECRET">PUSHBULLET_CLIENT_SECRET</a></li>
+<li><a href="#PUSHOVER_API_TOKEN">PUSHOVER_API_TOKEN</a></li>
+<li><a href="#PUSHOVER_EMERGENCY_EXPIRATION">PUSHOVER_EMERGENCY_EXPIRATION</a></li>
+<li><a href="#PUSHOVER_EMERGENCY_RETRY_DELAY">PUSHOVER_EMERGENCY_RETRY_DELAY</a></li>
+<li><a href="#PUSHOVER_SUBSCRIPTION_URL">PUSHOVER_SUBSCRIPTION_URL</a></li>
+<li><a href="#REGISTRATION_OPEN">REGISTRATION_OPEN</a></li>
+<li><a href="#REMOTE_USER_HEADER">REMOTE_USER_HEADER</a></li>
+<li><a href="#RP_ID">RP_ID</a></li>
+<li><a href="#S3_ACCESS_KEY">S3_ACCESS_KEY</a></li>
+<li><a href="#S3_BUCKET">S3_BUCKET</a></li>
+<li><a href="#S3_ENDPOINT">S3_ENDPOINT</a></li>
+<li><a href="#S3_REGION">S3_REGION</a></li>
+<li><a href="#S3_SECRET_KEY">S3_SECRET_KEY</a></li>
+<li><a href="#S3_TIMEOUT">S3_TIMEOUT</a></li>
+<li><a href="#SECRET_KEY">SECRET_KEY</a></li>
+<li><a href="#SHELL_ENABLED">SHELL_ENABLED</a></li>
+<li><a href="#SIGNAL_CLI_SOCKET">SIGNAL_CLI_SOCKET</a></li>
+<li><a href="#SITE_LOGO_URL">SITE_LOGO_URL</a></li>
+<li><a href="#SITE_NAME">SITE_NAME</a></li>
+<li><a href="#SITE_ROOT">SITE_ROOT</a></li>
+<li><a href="#SLACK_CLIENT_ID">SLACK_CLIENT_ID</a></li>
+<li><a href="#SLACK_CLIENT_SECRET">SLACK_CLIENT_SECRET</a></li>
+<li><a href="#SLACK_ENABLED">SLACK_ENABLED</a></li>
+<li><a href="#SPIKE_ENABLED">SPIKE_ENABLED</a></li>
+<li><a href="#TELEGRAM_BOT_NAME">TELEGRAM_BOT_NAME</a></li>
+<li><a href="#TELEGRAM_TOKEN">TELEGRAM_TOKEN</a></li>
+<li><a href="#TRELLO_APP_KEY">TRELLO_APP_KEY</a></li>
+<li><a href="#TWILIO_ACCOUNT">TWILIO_ACCOUNT</a></li>
+<li><a href="#TWILIO_AUTH">TWILIO_AUTH</a></li>
+<li><a href="#TWILIO_FROM">TWILIO_FROM</a></li>
+<li><a href="#TWILIO_USE_WHATSAPP">TWILIO_USE_WHATSAPP</a></li>
+<li><a href="#USE_PAYMENTS">USE_PAYMENTS</a></li>
+<li><a href="#VICTOROPS_ENABLED">VICTOROPS_ENABLED</a></li>
+<li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
+<li><a href="#ZULIP_ENABLED">ZULIP_ENABLED</a></li>
+</ul>
 
 ## `ALLOWED_HOSTS` {: #ALLOWED_HOSTS }
 
@@ -16,7 +95,7 @@ ALLOWED_HOSTS=my-hc.example.org,alternative-name.example.org
 
 Apart from the comma-separated syntax, this is a standard Django setting.
 Read more about it in the
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#allowed-hosts).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#allowed-hosts).
 
 ## `APPRISE_ENABLED` {: #APPRISE_ENABLED }
 
@@ -42,35 +121,35 @@ The database engine to use. Possible values: `sqlite`, `postgres`, `mysql`.
 Default: `0`
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#conn-max-age).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#conn-max-age).
 
 ## `DB_HOST` {: #DB_HOST }
 
 Default: `""` (empty string)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#host).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#host).
 
 ## `DB_NAME` {: #DB_NAME }
 
 Default: `hc` (PostgreSQL, MySQL) or `/path/to/projectdir/hc.sqlite` (SQLite)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#name).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#name).
 
 ## `DB_PASSWORD` {: #DB_PASSWORD }
 
 Default: `""` (empty string)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#password).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#password).
 
 ## `DB_PORT` {: #DB_PORT }
 
 Default: `""` (empty string)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#port).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#port).
 
 ## `DB_SSLMODE` {: #DB_SSLMODE }
 
@@ -89,7 +168,7 @@ PostgreSQL-specific, [details](https://www.postgresql.org/docs/10/libpq-connect.
 Default: `postgres` (PostgreSQL) or `root` (MySQL)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#user).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#user).
 
 ## `DEBUG` {: #DEBUG }
 
@@ -100,14 +179,14 @@ A boolean that turns on/off debug mode.
 _Never run a Healthchecks instance in production with the debug mode turned on!_
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#debug).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#debug).
 
 ## `DEFAULT_FROM_EMAIL` {: #DEFAULT_FROM_EMAIL }
 
 Default: `healthchecks@example.org`
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#default-from-email).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#default-from-email).
 
 ## `DISCORD_CLIENT_ID` {: #DISCORD_CLIENT_ID }
 
@@ -139,35 +218,42 @@ The Discord Client Secret, required by the Discord integration. Look it up at
 Default: `""` (empty string)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#email-host).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#email-host).
 
 ## `EMAIL_HOST_PASSWORD` {: #EMAIL_HOST_PASSWORD }
 
 Default: `""` (empty string)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#email-host-password).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#email-host-password).
 
 ## `EMAIL_HOST_USER` {: #EMAIL_HOST_USER }
 
 Default: `""` (empty string)
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#email-host-user).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#email-host-user).
 
 ## `EMAIL_PORT` {: #EMAIL_PORT }
 
 Default: `587`
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#email-port).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#email-port).
 
 ## `EMAIL_USE_TLS` {: #EMAIL_USE_TLS }
 
 Default: `True`
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#email-use-tls).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#email-use-tls).
+
+## `EMAIL_USE_SSL` {: #EMAIL_USE_SSL}
+
+Default: `False`
+
+This is a standard Django setting, read more in
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#email-use-ssl).
 
 ## `EMAIL_USE_VERIFICATION` {: #EMAIL_USE_VERIFICATION }
 
@@ -182,6 +268,48 @@ after the user clicks the verification link.
 If you are setting up a private healthchecks instance where
 you trust your users, you can opt to disable the verification step. In that case,
 set `EMAIL_USE_VERIFICATION` to `False`.
+
+## `http_proxy` and `https_proxy` {: #http_proxy}
+
+Default: `""` (empty string)
+
+Specifies the proxy server to use for outgoing HTTP and HTTPS requests.
+Supports different proxy server types. Examples:
+
+```
+https_proxy=http://example.org:1234
+https_proxy=https://example.org:1234
+https_proxy=socks4://example.org:1234
+https_proxy=socks5://example.org:1234
+```
+
+Healthchecks uses libcurl as the HTTP client library for making HTTP(S) requests.
+For more information about the proxy functionality, please see
+[libcurl documentation](https://curl.se/libcurl/c/CURLOPT_PROXY.html).
+
+## `INTEGRATIONS_ALLOW_PRIVATE_IPS` {: #INTEGRATIONS_ALLOW_PRIVATE_IPS }
+
+Default: `False`
+
+A boolean that controls whether the integrations are allowed to make
+HTTP(S) requests to private IP addresses (127.0.0.1, 192.168.x.x, ...). This setting
+is set to `False` by default, because allowing users to define webhooks that probe
+internal addresses is a security risk.
+
+Only enable this setting if you run your Healthchecks instance in a trusted
+environment, and need to integrate with services running in your internal network.
+
+This setting affects all integration types, not just webhooks. For example,
+if you run a Gotify instance on `localhost`, you will need to enable
+`INTEGRATIONS_ALLOW_PRIVATE_IPS` to be able to use it via the Gotify integration.
+
+This setting affects all outbound HTTP requests, including those made
+while setting up new integrations (e.g. during the OAuth2 authorization flow).
+
+This setting also affects connections to the proxy server when the `http_proxy` or
+`https_proxy` environment variables are set. If your proxy server has a private
+IP address, you will need to enable `INTEGRATIONS_ALLOW_PRIVATE_IPS`
+in order to use it.
 
 ## `LINENOTIFY_CLIENT_ID` {: #LINENOTIFY_CLIENT_ID }
 
@@ -489,7 +617,7 @@ A secret key used for cryptographic signing. Should be set to a unique,
 unpredictable value.
 
 This is a standard Django setting, read more in
-[Django documentation](https://docs.djangoproject.com/en/4.0/ref/settings/#secret-key).
+[Django documentation](https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key).
 
 ## `SHELL_ENABLED` {: #SHELL_ENABLED }
 
@@ -527,13 +655,28 @@ To enable the Signal integration:
 Default: `None`
 
 An URL pointing to the image you want to use as the site logo. If not set,
-Healthchecks will use a fallback image (`/static/img/logo.png`).
+Healthchecks will use a fallback image: `/static/img/logo.png`.
 
-Example:
+You can place a custom logo in `/static/img/` and point `SITE_LOGO_URL`
+to it like so:
 
 ```ini
-SITE_LOGO_URL=https://example.org/my-custom-logo.svg
+SITE_LOGO_URL=/static/img/my-custom-logo.png
 ```
+
+Or you can serve the logo from another server, and point to it using an absolute URL:
+
+```ini
+SITE_LOGO_URL=https://example.org/cdn/my-custom-logo.png
+```
+
+Either way, Healthchecks will use the provided `SITE_LOGO_URL` value as-is in HTML
+pages, and you should use an URL that **the end user's browser will be able to
+access directly**. The logo image can use any image format supported by browsers
+(PNG, SVG, JPG are all fine).
+
+Please do not use the Healthchecks.io logo (the one with the dark green background) on
+self-hosted instances. This logo is not part of the Healthchecks open source project.
 
 ## `SITE_NAME` {: #SITE_NAME }
 

@@ -1,9 +1,11 @@
+from collections import defaultdict
 from datetime import timedelta as td
 import email
 import json
 import os
 import re
 from secrets import token_urlsafe
+import sqlite3
 from urllib.parse import urlencode, urlparse
 
 from cron_descriptor import ExpressionDescriptor
@@ -34,7 +36,6 @@ from hc.api.models import (
     MAX_DELTA,
     Channel,
     Check,
-    Flip,
     Ping,
     Notification,
 )
@@ -48,10 +49,9 @@ from hc.front.templatetags.hc_extras import (
     sortchecks,
     site_hostname,
 )
-from hc.lib import jsonschema
+from hc.lib import curl, jsonschema
 from hc.lib.badges import get_badge_url
 from hc.lib.tz import all_timezones
-import requests
 
 try:
     from zoneinfo import ZoneInfo
@@ -298,33 +298,78 @@ def switch_channel(request, code, channel_code):
     return HttpResponse()
 
 
+def _get_project_summary(profile):
+    statuses = defaultdict(lambda: {"status": "up", "started": False})
+    q = profile.checks_from_all_projects()
+    q = q.annotate(project_code=F("project__code"))
+    for check in q:
+        summary = statuses[check.project_code]
+        if check.last_start:
+            summary["started"] = True
+
+        if summary["status"] != "down":
+            status = check.get_status()
+            if status == "down" or (status == "grace" and summary["status"] == "up"):
+                summary["status"] = status
+
+    return statuses
+
+
 def index(request):
-    if request.user.is_authenticated:
-        project_ids = request.profile.projects().values("id")
+    if not request.user.is_authenticated:
+        return redirect("hc-login")
 
-        q = Project.objects.filter(id__in=project_ids)
-        q = q.annotate(n_checks=Count("check", distinct=True))
-        q = q.annotate(n_channels=Count("channel", distinct=True))
-        q = q.annotate(owner_email=F("owner__email"))
+    summary = _get_project_summary(request.profile)
+    if "refresh" in request.GET:
+        return JsonResponse({str(k): v for k, v in summary.items()})
 
-        projects = list(q)
-        # Primary sort key: projects with overall_status=down go first
-        # Secondary sort key: project's name
-        projects.sort(key=lambda p: (p.overall_status() != "down", p.name))
+    q = request.profile.projects()
+    q = q.annotate(n_checks=Count("check", distinct=True))
+    q = q.annotate(n_channels=Count("channel", distinct=True))
+    q = q.annotate(owner_email=F("owner__email"))
+    projects = list(q)
+    for project in projects:
+        project.overall_status = summary[project.code]["status"]
+        project.any_started = summary[project.code]["started"]
 
-        ctx = {
-            "page": "projects",
-            "projects": projects,
-            "last_project_id": request.session.get("last_project_id"),
-        }
+    # Primary sort key: projects with overall_status=down go first
+    # Secondary sort key: project's name
+    projects.sort(key=lambda p: (p.overall_status != "down", p.name))
 
-        return render(request, "front/projects.html", ctx)
+    ctx = {
+        "page": "projects",
+        "projects": projects,
+        "last_project_id": request.session.get("last_project_id"),
+    }
 
-    return redirect("hc-login")
+    return render(request, "front/projects.html", ctx)
 
 
 def dashboard(request):
     return render(request, "front/dashboard.html", {})
+
+
+def _replace_placeholders(doc, html):
+    if doc.startswith("self_hosted"):
+        return html
+
+    replaces = {
+        "{{ default_timeout }}": str(int(DEFAULT_TIMEOUT.total_seconds())),
+        "{{ default_grace }}": str(int(DEFAULT_GRACE.total_seconds())),
+        "SITE_NAME": settings.SITE_NAME,
+        "SITE_ROOT": settings.SITE_ROOT,
+        "SITE_HOSTNAME": site_hostname(),
+        "SITE_SCHEME": urlparse(settings.SITE_ROOT).scheme,
+        "PING_ENDPOINT": settings.PING_ENDPOINT,
+        "PING_URL": settings.PING_ENDPOINT + "your-uuid-here",
+        "PING_BODY_LIMIT": str(settings.PING_BODY_LIMIT or 100),
+        "IMG_URL": os.path.join(settings.STATIC_URL, "img/docs"),
+    }
+
+    for placeholder, value in replaces.items():
+        html = html.replace(placeholder, value)
+
+    return html
 
 
 def serve_doc(request, doc="introduction"):
@@ -340,23 +385,7 @@ def serve_doc(request, doc="introduction"):
     with open(path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    if not doc.startswith("self_hosted"):
-        replaces = {
-            "{{ default_timeout }}": str(int(DEFAULT_TIMEOUT.total_seconds())),
-            "{{ default_grace }}": str(int(DEFAULT_GRACE.total_seconds())),
-            "SITE_NAME": settings.SITE_NAME,
-            "SITE_ROOT": settings.SITE_ROOT,
-            "SITE_HOSTNAME": site_hostname(),
-            "SITE_SCHEME": urlparse(settings.SITE_ROOT).scheme,
-            "PING_ENDPOINT": settings.PING_ENDPOINT,
-            "PING_URL": settings.PING_ENDPOINT + "your-uuid-here",
-            "PING_BODY_LIMIT": str(settings.PING_BODY_LIMIT or 100),
-            "IMG_URL": os.path.join(settings.STATIC_URL, "img/docs"),
-        }
-
-        for placeholder, value in replaces.items():
-            content = content.replace(placeholder, value)
-
+    content = _replace_placeholders(doc, content)
     ctx = {
         "page": "docs",
         "section": doc,
@@ -365,6 +394,30 @@ def serve_doc(request, doc="introduction"):
     }
 
     return render(request, "front/docs_single.html", ctx)
+
+
+@csrf_exempt
+def docs_search(request):
+    form = forms.SearchForm(request.GET)
+    if not form.is_valid():
+        ctx = {"results": []}
+        return render(request, "front/docs_search.html", ctx)
+
+    query = """
+        SELECT slug, title, snippet(docs, 2, '<span>', '</span>', '&hellip;', 10)
+        FROM docs
+        WHERE docs MATCH ?
+        ORDER BY bm25(docs, 2.0, 10.0, 1.0)
+        LIMIT 8
+    """
+
+    q = form.cleaned_data["q"]
+    con = sqlite3.connect(os.path.join(settings.BASE_DIR, "search.db"))
+    cur = con.cursor()
+    res = cur.execute(query, (q,))
+
+    ctx = {"results": res.fetchall()}
+    return render(request, "front/docs_search.html", ctx)
 
 
 def docs_cron(request):
@@ -473,14 +526,7 @@ def update_timeout(request, code):
         # We need to create the Flip object because otherwise the calculation
         # in Check.downtimes() will come out wrong (when this check later comes up,
         # we will have no record of when it went down).
-
-        flip = Flip(owner=check)
-        flip.created = now()
-        # mark as processed, don't want sendalerts to process this!
-        flip.processed = flip.created
-        flip.old_status = check.status
-        flip.new_status = "down"
-        flip.save()
+        check.create_flip("down", mark_as_processed=True)
 
         check.alert_after = None
         check.status = "down"
@@ -587,6 +633,9 @@ def ping_body(request, code, n):
 def pause(request, code):
     check = _get_rw_check_for_user(request, code)
 
+    # Track the status change for correct downtime calculation in Check.downtimes()
+    check.create_flip("paused", mark_as_processed=True)
+
     check.status = "paused"
     check.last_start = None
     check.alert_after = None
@@ -607,6 +656,10 @@ def pause(request, code):
 @login_required
 def resume(request, code):
     check = _get_rw_check_for_user(request, code)
+    if check.status != "paused":
+        return HttpResponseBadRequest()
+
+    check.create_flip("new", mark_as_processed=True)
 
     check.status = "new"
     check.last_start = None
@@ -631,14 +684,15 @@ def _get_events(check, limit):
     pings = Ping.objects.filter(owner=check).order_by("-id")[:limit]
     pings = list(pings)
 
-    prev = None
+    last_start = None
     for ping in reversed(pings):
-        if ping.kind != "start" and prev and prev.kind == "start":
-            delta = ping.created - prev.created
+        if ping.kind == "start":
+            last_start = ping.created
+        elif ping.kind in (None, "", "fail") and last_start:
+            delta = ping.created - last_start
+            last_start = None
             if delta < MAX_DELTA:
                 setattr(ping, "delta", delta)
-
-        prev = ping
 
     alerts = []
     if len(pings):
@@ -1309,14 +1363,12 @@ def add_slack_complete(request):
     if request.GET.get("state") != state:
         return HttpResponseForbidden()
 
-    result = requests.post(
-        "https://slack.com/api/oauth.v2.access",
-        {
-            "client_id": settings.SLACK_CLIENT_ID,
-            "client_secret": settings.SLACK_CLIENT_SECRET,
-            "code": request.GET.get("code"),
-        },
-    )
+    data = {
+        "client_id": settings.SLACK_CLIENT_ID,
+        "client_secret": settings.SLACK_CLIENT_SECRET,
+        "code": request.GET.get("code"),
+    }
+    result = curl.post("https://slack.com/api/oauth.v2.access", data)
 
     doc = result.json()
     if doc.get("ok"):
@@ -1394,15 +1446,13 @@ def add_pushbullet_complete(request):
     if request.GET.get("state") != state:
         return HttpResponseForbidden()
 
-    result = requests.post(
-        "https://api.pushbullet.com/oauth2/token",
-        {
-            "client_id": settings.PUSHBULLET_CLIENT_ID,
-            "client_secret": settings.PUSHBULLET_CLIENT_SECRET,
-            "code": request.GET.get("code"),
-            "grant_type": "authorization_code",
-        },
-    )
+    data = {
+        "client_id": settings.PUSHBULLET_CLIENT_ID,
+        "client_secret": settings.PUSHBULLET_CLIENT_SECRET,
+        "code": request.GET.get("code"),
+        "grant_type": "authorization_code",
+    }
+    result = curl.post("https://api.pushbullet.com/oauth2/token", data)
 
     doc = result.json()
     if "access_token" in doc:
@@ -1454,16 +1504,14 @@ def add_discord_complete(request):
     if request.GET.get("state") != state:
         return HttpResponseForbidden()
 
-    result = requests.post(
-        "https://discordapp.com/api/oauth2/token",
-        {
-            "client_id": settings.DISCORD_CLIENT_ID,
-            "client_secret": settings.DISCORD_CLIENT_SECRET,
-            "code": request.GET.get("code"),
-            "grant_type": "authorization_code",
-            "redirect_uri": settings.SITE_ROOT + reverse(add_discord_complete),
-        },
-    )
+    data = {
+        "client_id": settings.DISCORD_CLIENT_ID,
+        "client_secret": settings.DISCORD_CLIENT_SECRET,
+        "code": request.GET.get("code"),
+        "grant_type": "authorization_code",
+        "redirect_uri": settings.SITE_ROOT + reverse(add_discord_complete),
+    }
+    result = curl.post("https://discordapp.com/api/oauth2/token", data)
 
     doc = result.json()
     if "access_token" in doc:
@@ -1941,18 +1989,17 @@ def add_apprise(request, code):
 def trello_settings(request):
     token = request.POST.get("token")
 
-    url = "https://api.trello.com/1/members/me/boards?" + urlencode(
-        {
-            "key": settings.TRELLO_APP_KEY,
-            "token": token,
-            "filter": "open",
-            "fields": "id,name",
-            "lists": "open",
-            "list_fields": "id,name",
-        }
-    )
+    url = "https://api.trello.com/1/members/me/boards"
+    params = {
+        "key": settings.TRELLO_APP_KEY,
+        "token": token,
+        "filter": "open",
+        "fields": "id,name",
+        "lists": "open",
+        "list_fields": "id,name",
+    }
 
-    boards = requests.get(url).json()
+    boards = curl.get(url, params=params).json()
     num_lists = sum(len(board["lists"]) for board in boards)
 
     ctx = {"token": token, "boards": boards, "num_lists": num_lists}
@@ -2110,16 +2157,14 @@ def add_linenotify_complete(request):
         return redirect("hc-channels", project.code)
 
     # Exchange code for access token
-    result = requests.post(
-        "https://notify-bot.line.me/oauth/token",
-        {
-            "grant_type": "authorization_code",
-            "code": request.GET.get("code"),
-            "redirect_uri": settings.SITE_ROOT + reverse(add_linenotify_complete),
-            "client_id": settings.LINENOTIFY_CLIENT_ID,
-            "client_secret": settings.LINENOTIFY_CLIENT_SECRET,
-        },
-    )
+    data = {
+        "grant_type": "authorization_code",
+        "code": request.GET.get("code"),
+        "redirect_uri": settings.SITE_ROOT + reverse(add_linenotify_complete),
+        "client_id": settings.LINENOTIFY_CLIENT_ID,
+        "client_secret": settings.LINENOTIFY_CLIENT_SECRET,
+    }
+    result = curl.post("https://notify-bot.line.me/oauth/token", data)
 
     doc = result.json()
     if doc.get("status") != 200:
@@ -2128,7 +2173,7 @@ def add_linenotify_complete(request):
 
     # Fetch notification target's name, will use it as channel name:
     token = doc["access_token"]
-    result = requests.get(
+    result = curl.get(
         "https://notify-api.line.me/api/status",
         headers={"Authorization": "Bearer %s" % token},
     )
