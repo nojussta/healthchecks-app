@@ -680,9 +680,12 @@ def remove_check(request, code):
     return redirect("hc-checks", project.code)
 
 
-def _get_events(check, limit):
-    pings = Ping.objects.filter(owner=check).order_by("-id")[:limit]
-    pings = list(pings)
+def _get_events(check, page_limit, start=None, end=None):
+    pings = check.visible_pings.order_by("-id")
+    if start and end:
+        pings = pings.filter(created__gte=start, created__lte=end)
+
+    pings = list(pings[:page_limit])
 
     last_start = None
     for ping in reversed(pings):
@@ -694,12 +697,15 @@ def _get_events(check, limit):
             if delta < MAX_DELTA:
                 setattr(ping, "delta", delta)
 
-    alerts = []
-    if len(pings):
+    alerts = Notification.objects.select_related("channel")
+    alerts = alerts.filter(owner=check, check_status="down")
+    if start and end:
+        alerts = alerts.filter(created__gte=start, created__lte=end)
+    elif len(pings):
         cutoff = pings[-1].created
-        alerts = Notification.objects.select_related("channel").filter(
-            owner=check, check_status="down", created__gt=cutoff
-        )
+        alerts = alerts.filter(created__gt=cutoff)
+    else:
+        alerts = []
 
     events = pings + list(alerts)
     events.sort(key=lambda el: el.created, reverse=True)
@@ -710,13 +716,33 @@ def _get_events(check, limit):
 def log(request, code):
     check, rw = _get_check_for_user(request, code)
 
-    limit = check.project.owner_profile.ping_log_limit
+    smax = now()
+    smin = smax - td(hours=24)
+    ping = check.visible_pings.first()
+    if ping:
+        smin = min(smin, ping.created)
+
+    # Align slider steps to full hours
+    smin = smin.replace(minute=0, second=0)
+
+    form = forms.SeekForm(request.GET)
+    if form.is_valid():
+        start = form.cleaned_data["start"]
+        end = form.cleaned_data["end"]
+    else:
+        start, end = smin, smax
+
+    total = check.visible_pings.filter(created__gte=start, created__lte=end).count()
     ctx = {
+        "page": "log",
         "project": check.project,
         "check": check,
-        "events": _get_events(check, limit),
-        "limit": limit,
-        "show_limit_notice": check.n_pings > limit and settings.USE_PAYMENTS,
+        "min": smin,
+        "max": smax,
+        "start": start,
+        "end": end,
+        "events": _get_events(check, 1000, start=start, end=end),
+        "num_total": total,
     }
 
     return render(request, "front/log.html", ctx)

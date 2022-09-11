@@ -1,9 +1,5 @@
-body.dark .noUi-background {
-    background-color: #3c3939;
-    box-shadow:  none;
-}
-
 body.dark .noUi-target {
+    background-color: #3c3939;
     border-color: #515151;
     box-shadow: none;
 }
@@ -20,8 +16,4 @@ body.dark .noUi-handle {
 
 body.dark .noUi-marker {
     background: #777;
-}
-
-body.dark .noUi-pips {
-    color: hsl(240, 3%, 55%);
 }

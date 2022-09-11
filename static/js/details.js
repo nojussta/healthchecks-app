@@ -134,7 +134,9 @@ $(function () {
     });
 
     $("#events").on("click", "tr.ok", function() {
-        loadPingDetails(this.dataset.url);
+        var n = $("td", this).first().text();
+        var tmpl = $("#log").data("url").slice(0, -2);
+        loadPingDetails(tmpl + n + "/");
         return false;
     });
 
@@ -143,7 +145,7 @@ $(function () {
         lastFormat = format;
 
         document.querySelectorAll("#log tr").forEach(function(row) {
-            var dt = moment(row.dataset.dt);
+            var dt = moment.unix(row.dataset.dt).utc();
             format == "local" ? dt.local() : dt.tz(format);
 
             row.children[1].textContent = dt.format("MMM D");
