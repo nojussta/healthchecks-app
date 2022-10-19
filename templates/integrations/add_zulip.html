@@ -11,8 +11,7 @@
     <p>
         <a href="https://zulipchat.com/">Zulip</a> is an open-source group chat app
         with an email threading model. If you use or plan on using Zulip,
-        you can can integrate it
-        with your {{ site_name }} account in few simple steps.
+        you can integrate it with your {{ site_name }} account in a few simple steps.
     </p>
 
     <h2>Setup Guide</h2>
@@ -22,7 +21,7 @@
             <p>
                 Log into your Zulip account,
                 click on the <strong>gear icon</strong> in the upper right corner,
-                and select <strong>Settings</strong>.
+                and select <strong>Personal Settings</strong>.
             </p>
         </div>
         <div class="col-sm-6">
@@ -36,13 +35,13 @@
         <div class="col-sm-6">
             <span class="step-no"></span>
             <p>
-                Got to <strong>Your bots › Add a new bot </strong> and fill
+                Go to <strong>Bots › Add a new bot </strong> and fill
                 out the fields.
             </p>
             <p>
                 For <strong>Bot Type</strong>,
-                select "Incoming webhook". You can choose your own preferred values
-                for bot's name and email.
+                select "Incoming webhook". You can choose your preferred values
+                for the bot's name and email.
             </p>
             <p>
                 For the profile picture, feel free to use the {{ site_name }} logo:
@@ -52,7 +51,7 @@
             </p>
             <p>
                 After you have filled out the values,
-                click on <strong>Create Bot</strong>.
+                click on <strong>Add</strong>.
             </p>
         </div>
         <div class="col-sm-6">
@@ -69,7 +68,7 @@
             <p>
                 Download the bot's <code>zuliprc</code> file by clicking on the
                 <strong>cyan download icon</strong>, and upload it in the form below.
-                Also specify the stream or the private user you want {{ site_name }}
+                Also, specify the stream or the private user you want {{ site_name }}
                 to post notifications to.
             </p>
             <p>
@@ -104,8 +103,6 @@
             </div>
         </div>
 
-
-
         <div id="z-mtype-group" class="form-group {{ form.mtype.css_classes }}">
             <label class="col-sm-2 control-label">Post To</label>
             <div class="col-sm-4">
@@ -135,7 +132,7 @@
             {% if form.mtype.value == "private" %}
                 User's Email
             {% else %}
-                Stream Name
+                Stream
             {% endif %}
             </label>
             <div class="col-sm-4">
@@ -152,6 +149,22 @@
                 {% else %}
                     Example: "{% if form.mtype.value == "private" %}alice@example.org{% else %}general{% endif%}"
                 {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div id="z-topic-group" class="form-group {% if form.mtype.value == 'private' %}hide{% endif %} {{ form.topic.css_classes }}">
+            <label for="z-topic" class="col-sm-2 control-label">Topic</label>
+            <div class="col-sm-4">
+                <input
+                    id="z-topic"
+                    type="text"
+                    class="form-control"
+                    name="topic"
+                    value="{{ form.topic.value|default:"" }}">
+                <div class="help-block">
+                    Example: "Alerts". Leave empty to use auto-generated topics in the form:
+                    "{check name} is {status}".
                 </div>
             </div>
         </div>

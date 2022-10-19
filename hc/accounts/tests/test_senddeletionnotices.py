@@ -1,9 +1,12 @@
-from datetime import timedelta as td
+from __future__ import annotations
+
 import re
+from datetime import timedelta as td
 from unittest.mock import Mock
 
 from django.core import mail
 from django.utils.timezone import now
+
 from hc.accounts.management.commands.senddeletionnotices import Command
 from hc.accounts.models import Member
 from hc.api.models import Check, Ping
@@ -11,7 +14,7 @@ from hc.test import BaseTestCase
 
 
 def counts(result):
-    """ Extract integer values from command's return value. """
+    """Extract integer values from command's return value."""
     return [int(s) for s in re.findall(r"\d+", result)]
 
 

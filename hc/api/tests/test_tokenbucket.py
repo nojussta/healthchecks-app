@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from datetime import timedelta as td
 
 from django.test.utils import override_settings
 from django.utils.timezone import now
+
 from hc.api.models import TokenBucket
 from hc.test import BaseTestCase
 
@@ -35,7 +38,7 @@ class TokenBucketTestCase(BaseTestCase):
         self.assertTrue(r)
 
         obj.refresh_from_db()
-        self.assertAlmostEqual(obj.tokens, 0.45, places=5)
+        self.assertAlmostEqual(obj.tokens, 0.45, places=4)
 
     def test_it_normalizes_email(self):
         emails = ("alice+alias@example.org", "a.li.ce@example.org")

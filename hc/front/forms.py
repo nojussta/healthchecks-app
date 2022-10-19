@@ -1,12 +1,17 @@
-from datetime import datetime, timedelta as td, timezone
+from __future__ import annotations
+
 import json
 import re
+from datetime import datetime
+from datetime import timedelta as td
+from datetime import timezone
 from urllib.parse import quote, urlencode
 
 from django import forms
-from django.forms import URLField
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.forms import URLField
+
 from hc.front.validators import (
     CronExpressionValidator,
     TimezoneValidator,
@@ -311,6 +316,7 @@ class AddZulipForm(forms.Form):
     site = forms.URLField(max_length=100, validators=[WebhookValidator()])
     mtype = forms.ChoiceField(choices=ZULIP_TARGETS)
     to = forms.CharField(max_length=100)
+    topic = forms.CharField(max_length=100, required=False)
 
     def get_value(self):
         return json.dumps(dict(self.cleaned_data), sort_keys=True)
@@ -349,3 +355,11 @@ class SeekForm(forms.Form):
 
     def clean_end(self):
         return datetime.fromtimestamp(self.cleaned_data["end"], tz=timezone.utc)
+
+
+class TransferForm(forms.Form):
+    project = forms.UUIDField()
+
+
+class AddTelegramForm(forms.Form):
+    project = forms.UUIDField()

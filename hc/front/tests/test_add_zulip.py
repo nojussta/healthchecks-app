@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from django.test.utils import override_settings
+
 from hc.api.models import Channel
 from hc.test import BaseTestCase
 
@@ -10,6 +13,7 @@ def _get_payload(**kwargs):
         "site": "https://example.org",
         "mtype": "stream",
         "to": "general",
+        "topic": "foo",
     }
 
     payload.update(kwargs)
@@ -37,6 +41,7 @@ class AddZulipTestCase(BaseTestCase):
         self.assertEqual(c.zulip_api_key, "fake-key")
         self.assertEqual(c.zulip_type, "stream")
         self.assertEqual(c.zulip_to, "general")
+        self.assertEqual(c.zulip_topic, "foo")
 
     def test_it_rejects_bad_email(self):
         payload = _get_payload(bot_email="not@an@email")

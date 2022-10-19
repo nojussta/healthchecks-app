@@ -1,15 +1,19 @@
-from collections import defaultdict
-from datetime import timedelta as td
+from __future__ import annotations
+
 import email
 import json
 import os
 import re
-from secrets import token_urlsafe
 import sqlite3
+import sys
+from collections import defaultdict
+from datetime import timedelta as td
+from secrets import token_urlsafe
 from urllib.parse import urlencode, urlparse
+from uuid import UUID
 
 from cron_descriptor import ExpressionDescriptor
-from cronsim.cronsim import CronSim, CronSimError
+from cronsim import CronSim, CronSimError
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -18,6 +22,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Count, F
 from django.http import (
     Http404,
+    HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseForbidden,
@@ -29,33 +34,34 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from hc.accounts.models import Project, Member
+
+from hc.accounts.models import Member, Project
 from hc.api.models import (
     DEFAULT_GRACE,
     DEFAULT_TIMEOUT,
     MAX_DELTA,
     Channel,
     Check,
-    Ping,
     Notification,
+    Ping,
 )
 from hc.api.transports import Telegram, TransportError
-from hc.front.decorators import require_setting
 from hc.front import forms
+from hc.front.decorators import require_setting
 from hc.front.schemas import telegram_callback
 from hc.front.templatetags.hc_extras import (
-    num_down_title,
     down_title,
-    sortchecks,
+    num_down_title,
     site_hostname,
+    sortchecks,
 )
 from hc.lib import curl, jsonschema
 from hc.lib.badges import get_badge_url
 from hc.lib.tz import all_timezones
 
-try:
+if sys.version_info >= (3, 9):
     from zoneinfo import ZoneInfo
-except ImportError:
+else:
     from backports.zoneinfo import ZoneInfo
 
 
@@ -87,7 +93,7 @@ def _tags_statuses(checks):
     return tags, num_down
 
 
-def _get_check_for_user(request, code):
+def _get_check_for_user(request: HttpRequest, code: UUID) -> tuple[Check, bool]:
     """Return specified check if current user has access to it."""
 
     assert request.user.is_authenticated
@@ -103,7 +109,7 @@ def _get_check_for_user(request, code):
     return check, membership.is_rw
 
 
-def _get_rw_check_for_user(request, code):
+def _get_rw_check_for_user(request: HttpRequest, code: UUID) -> Check:
     check, rw = _get_check_for_user(request, code)
     if not rw:
         raise PermissionDenied
@@ -111,7 +117,7 @@ def _get_rw_check_for_user(request, code):
     return check
 
 
-def _get_channel_for_user(request, code):
+def _get_channel_for_user(request: HttpRequest, code: UUID) -> tuple[Channel, bool]:
     """Return specified channel if current user has access to it."""
 
     assert request.user.is_authenticated
@@ -127,7 +133,7 @@ def _get_channel_for_user(request, code):
     return channel, membership.is_rw
 
 
-def _get_rw_channel_for_user(request, code):
+def _get_rw_channel_for_user(request: HttpRequest, code: UUID) -> Channel:
     channel, rw = _get_channel_for_user(request, code)
     if not rw:
         raise PermissionDenied
@@ -135,10 +141,10 @@ def _get_rw_channel_for_user(request, code):
     return channel
 
 
-def _get_project_for_user(request, project_code):
+def _get_project_for_user(request: HttpRequest, code: UUID) -> tuple[Project, bool]:
     """Check access, return (project, rw) tuple."""
 
-    project = get_object_or_404(Project, code=project_code)
+    project = get_object_or_404(Project, code=code)
     if request.user.is_superuser:
         return project, True
 
@@ -150,10 +156,10 @@ def _get_project_for_user(request, project_code):
     return project, membership.is_rw
 
 
-def _get_rw_project_for_user(request, project_code):
+def _get_rw_project_for_user(request: HttpRequest, code: UUID) -> Project:
     """Check access, return (project, rw) tuple."""
 
-    project, rw = _get_project_for_user(request, project_code)
+    project, rw = _get_project_for_user(request, code)
     if not rw:
         raise PermissionDenied
 
@@ -556,7 +562,7 @@ def cron_preview(request):
         it = CronSim(schedule, now_local)
         for i in range(0, 6):
             ctx["dates"].append(next(it))
-    except CronSimError:
+    except (CronSimError, StopIteration):
         ctx["bad_schedule"] = True
 
     if ctx["dates"]:
@@ -576,8 +582,11 @@ def validate_schedule(request):
     schedule = request.GET.get("schedule", "")
     result = True
     try:
-        CronSim(schedule, now())
-    except CronSimError:
+        # Does cronsim accept the schedule?
+        it = CronSim(schedule, now())
+        # Can it calculate the next datetime?
+        next(it)
+    except (CronSimError, StopIteration):
         result = False
 
     return JsonResponse({"result": result})
@@ -672,12 +681,32 @@ def resume(request, code):
 
 @require_POST
 @login_required
-def remove_check(request, code):
+def remove_check(request: HttpRequest, code: UUID) -> HttpResponse:
     check = _get_rw_check_for_user(request, code)
 
     project = check.project
     check.delete()
     return redirect("hc-checks", project.code)
+
+
+@require_POST
+@login_required
+def clear_events(request: HttpRequest, code: UUID) -> HttpResponse:
+    check = _get_rw_check_for_user(request, code)
+
+    check.status = "new"
+    check.last_ping = None
+    check.last_start = None
+    check.last_duration = None
+    check.has_confirmation_link = False
+    check.alert_after = None
+    check.save()
+
+    check.ping_set.all().delete()
+    check.notification_set.all().delete()
+    check.flip_set.all().delete()
+
+    return redirect("hc-details", code)
 
 
 def _get_events(check, page_limit, start=None, end=None):
@@ -718,7 +747,7 @@ def log(request, code):
 
     smax = now()
     smin = smax - td(hours=24)
-    ping = check.visible_pings.first()
+    ping = check.visible_pings.order_by("n").first()
     if ping:
         smin = min(smin, ping.created)
 
@@ -791,11 +820,15 @@ def uncloak(request, unique_key):
 
 
 @login_required
-def transfer(request, code):
+def transfer(request: HttpRequest, code: UUID) -> HttpResponse:
     check = _get_rw_check_for_user(request, code)
 
     if request.method == "POST":
-        target_project = _get_rw_project_for_user(request, request.POST["project"])
+        form = forms.TransferForm(request.POST)
+        if not form.is_valid():
+            return HttpResponseBadRequest()
+
+        target_project = _get_rw_project_for_user(request, form.cleaned_data["project"])
         if target_project.num_checks_available() <= 0:
             return HttpResponseBadRequest()
 
@@ -1049,8 +1082,8 @@ def unsubscribe_email(request, code, signed_token):
 
 @require_POST
 @login_required
-def send_test_notification(request, code):
-    channel, rw = _get_channel_for_user(request, code)
+def send_test_notification(request: HttpRequest, code: UUID) -> HttpResponse:
+    channel = _get_rw_channel_for_user(request, code)
 
     dummy = Check(name="TEST", status="down", project=channel.project)
     dummy.last_ping = now() - td(days=1)
@@ -1077,7 +1110,7 @@ def send_test_notification(request, code):
 
 @require_POST
 @login_required
-def remove_channel(request, code):
+def remove_channel(request: HttpRequest, code: UUID) -> HttpResponse:
     channel = _get_rw_channel_for_user(request, code)
     project = channel.project
     channel.delete()
@@ -1143,7 +1176,7 @@ def email_form(request, channel=None, code=None):
 
 
 @login_required
-def edit_channel(request, code):
+def edit_channel(request: HttpRequest, code: UUID) -> HttpResponse:
     channel = _get_rw_channel_for_user(request, code)
     if channel.kind == "email":
         return email_form(request, channel=channel)
@@ -1268,7 +1301,8 @@ def add_pd_complete(request):
     if "pagerduty" not in request.session:
         return HttpResponseBadRequest()
 
-    state, code = request.session.pop("pagerduty")
+    state, code_str = request.session.pop("pagerduty")
+    code = UUID(code_str)
     if request.GET.get("state") != state:
         return HttpResponseForbidden()
 
@@ -1376,11 +1410,12 @@ def add_slack_btn(request, code):
 @require_setting("SLACK_ENABLED")
 @require_setting("SLACK_CLIENT_ID")
 @login_required
-def add_slack_complete(request):
+def add_slack_complete(request: HttpRequest) -> HttpResponse:
     if "add_slack" not in request.session:
         return HttpResponseForbidden()
 
-    state, code = request.session.pop("add_slack")
+    state, code_str = request.session.pop("add_slack")
+    code = UUID(code_str)
     project = _get_rw_project_for_user(request, code)
     if request.GET.get("error") == "access_denied":
         messages.warning(request, "Slack setup was cancelled.")
@@ -1462,7 +1497,8 @@ def add_pushbullet_complete(request):
     if "add_pushbullet" not in request.session:
         return HttpResponseForbidden()
 
-    state, code = request.session.pop("add_pushbullet")
+    state, code_str = request.session.pop("add_pushbullet")
+    code = UUID(code_str)
     project = _get_rw_project_for_user(request, code)
 
     if request.GET.get("error") == "access_denied":
@@ -1520,7 +1556,8 @@ def add_discord_complete(request):
     if "add_discord" not in request.session:
         return HttpResponseForbidden()
 
-    state, code = request.session.pop("add_discord")
+    state, code_str = request.session.pop("add_discord")
+    code = UUID(code_str)
     project = _get_rw_project_for_user(request, code)
 
     if request.GET.get("error") == "access_denied":
@@ -1669,7 +1706,7 @@ def add_victorops(request, code):
 
 @require_setting("ZULIP_ENABLED")
 @login_required
-def add_zulip(request, code):
+def add_zulip(request: HttpRequest, code: UUID) -> HttpResponse:
     project = _get_rw_project_for_user(request, code)
 
     if request.method == "POST":
@@ -1750,7 +1787,11 @@ def add_telegram(request):
             return render(request, "bad_link.html")
 
     if request.method == "POST":
-        project = _get_rw_project_for_user(request, request.POST.get("project"))
+        form = forms.AddTelegramForm(request.POST)
+        if not form.is_valid():
+            return HttpResponseBadRequest()
+
+        project = _get_rw_project_for_user(request, form.cleaned_data["project"])
         channel = Channel(project=project, kind="telegram")
         channel.value = json.dumps(
             {"id": chat_id, "type": chat_type, "name": chat_name}
@@ -2173,7 +2214,8 @@ def add_linenotify_complete(request):
     if "add_linenotify" not in request.session:
         return HttpResponseForbidden()
 
-    state, code = request.session.pop("add_linenotify")
+    state, code_str = request.session.pop("add_linenotify")
+    code = UUID(code_str)
     if request.GET.get("state") != state:
         return HttpResponseForbidden()
 

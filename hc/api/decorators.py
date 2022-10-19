@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import json
 from functools import wraps
 
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
+
 from hc.accounts.models import Project
 from hc.lib.jsonschema import ValidationError, validate
 
@@ -62,7 +65,7 @@ def authorize_read(f):
 
 
 def validate_json(schema={"type": "object"}):
-    """ Parse request json and validate it against `schema`.
+    """Parse request json and validate it against `schema`.
 
     Put the parsed result in `request.json`.
     If schema is None then only parse and check if the root

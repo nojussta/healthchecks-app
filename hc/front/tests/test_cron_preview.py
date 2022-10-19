@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -58,3 +60,8 @@ class CronPreviewTestCase(BaseTestCase):
         payload = {"schedule": "0 0 29 2 *", "tz": "UTC"}
         r = self.client.post("/checks/cron_preview/", payload)
         self.assertContains(r, "Feb 29")
+
+    def test_it_handles_no_matches(self):
+        payload = {"schedule": "0 0 */100 * MON#2", "tz": "UTC"}
+        r = self.client.post("/checks/cron_preview/", payload)
+        self.assertContains(r, "Invalid cron expression", status_code=200)

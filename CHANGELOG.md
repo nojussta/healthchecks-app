@@ -1,15 +1,31 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## v2.4-dev - Unreleased
+## v2.5-dev - Unreleased
+
+### Improvements
+- Upgrade to fido2 1.1.0 and simplify hc.lib.webauthn
+
+## v2.4.1 - 2022-10-18
+
+### Bug Fixes
+- Fix the GHA workflow for building arm/v7 docker image
+
+## v2.4 - 2022-10-18
+
 ### Improvements
 - Add support for EMAIL_USE_SSL environment variable (#685)
 - Switch from requests to pycurl
 - Implement documentation search
 - Add date filters in the Log page
+- Upgrade to cronsim 2.3
+- Add support for the $BODY placeholder in webhook payloads (#708)
+- Implement the "Clear Events" function
+- Add support for custom topics in Zulip notifications (#583)
 
 ### Bug Fixes
 - Fix the handling of TooManyRedirects exceptions
+- Fix MySQL 8 support in the Docker image (upgrade from buster to bullseye) (#717)
 
 ## v2.3 - 2022-08-05
 

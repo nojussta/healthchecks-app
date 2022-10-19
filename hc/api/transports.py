@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
 import socket
 import time
-from urllib.parse import quote, urlencode, urljoin
 import uuid
+from urllib.parse import quote, urlencode, urljoin
 
 from django.conf import settings
 from django.template.loader import render_to_string
@@ -17,7 +19,6 @@ from hc.front.templatetags.hc_extras import sortchecks
 from hc.lib import curl, emails, jsonschema
 from hc.lib.date import format_duration
 from hc.lib.string import replace
-
 
 try:
     import apprise
@@ -49,6 +50,19 @@ def get_nested(obj, path, default=None):
             return default
         needle = needle[key]
     return needle
+
+
+def get_ping_body(ping) -> str | None:
+    body = None
+    if ping and ping.has_body():
+        body = ping.get_body()
+        if body is None and ping.object_size:
+            # Body is not uploaded to object storage yet.
+            # Wait 5 seconds, then fetch the body again.
+            time.sleep(5)
+            body = ping.get_body()
+
+    return body
 
 
 class TransportError(Exception):
@@ -140,15 +154,7 @@ class Email(Transport):
             projects = None
 
         ping = self.last_ping(check)
-        body = None
-        if ping and ping.has_body():
-            body = ping.get_body()
-            if body is None and ping.object_size:
-                # Body is not uploaded to object storage yet.
-                # Wait 5 seconds, then fetch the body again.
-                time.sleep(5)
-                body = ping.get_body()
-
+        body = get_ping_body(ping)
         ctx = {
             "check": check,
             "ping": ping,
@@ -256,7 +262,9 @@ class HttpTransport(Transport):
 
 
 class Webhook(HttpTransport):
-    def prepare(self, template: str, check, urlencode=False, latin1=False) -> str:
+    def prepare(
+        self, template: str, check, urlencode=False, latin1=False, allow_ping_body=False
+    ) -> str:
         """Replace variables with actual values."""
 
         def safe(s: str) -> str:
@@ -270,6 +278,11 @@ class Webhook(HttpTransport):
             "$TAGS": safe(check.tags),
             "$JSON": safe(json.dumps(check.to_dict())),
         }
+
+        # Materialize ping body only if template refers to it.
+        if allow_ping_body and "$BODY" in template:
+            body = get_ping_body(self.last_ping(check))
+            ctx["$BODY"] = body if body else ""
 
         for i, tag in enumerate(check.tags_list()):
             ctx["$TAG%d" % (i + 1)] = safe(tag)
@@ -306,7 +319,7 @@ class Webhook(HttpTransport):
 
         body = spec["body"]
         if body:
-            body = self.prepare(body, check).encode()
+            body = self.prepare(body, check, allow_ping_body=True).encode()
 
         # When sending a test notification, don't retry on failures.
         use_retries = True
@@ -810,12 +823,16 @@ class Zulip(HttpTransport):
         if not settings.ZULIP_ENABLED:
             raise TransportError("Zulip notifications are not enabled.")
 
+        topic = self.channel.zulip_topic
+        if not topic:
+            topic = tmpl("zulip_topic.html", check=check)
+
         url = self.channel.zulip_site + "/api/v1/messages"
         auth = (self.channel.zulip_bot_email, self.channel.zulip_api_key)
         data = {
             "type": self.channel.zulip_type,
             "to": self.channel.zulip_to,
-            "topic": tmpl("zulip_topic.html", check=check),
+            "topic": topic,
             "content": tmpl("zulip_content.html", check=check),
         }
 

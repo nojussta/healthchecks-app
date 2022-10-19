@@ -1,12 +1,15 @@
-# coding: utf-8
+from __future__ import annotations
 
-from datetime import datetime, timedelta as td, timezone
 import hashlib
 import json
 import socket
 import sys
 import time
 import uuid
+from datetime import datetime
+from datetime import timedelta as td
+from datetime import timezone
+from typing import TypedDict
 
 from cronsim import CronSim
 from django.conf import settings
@@ -14,8 +17,9 @@ from django.core.mail import mail_admins
 from django.core.signing import TimestampSigner
 from django.db import models
 from django.urls import reverse
-from django.utils.timezone import now
 from django.utils.text import slugify
+from django.utils.timezone import now
+
 from hc.accounts.models import Project
 from hc.api import transports
 from hc.lib import emails
@@ -77,11 +81,39 @@ PO_PRIORITIES = {
 }
 
 
-def isostring(dt):
+def isostring(dt) -> str | None:
     """Convert the datetime to ISO 8601 format with no microseconds."""
+    return dt.replace(microsecond=0).isoformat() if dt else None
 
-    if dt:
-        return dt.replace(microsecond=0).isoformat()
+
+class CheckDict(TypedDict, total=False):
+    name: str
+    slug: str
+    tags: str
+    desc: str
+    grace: int
+    n_pings: int
+    status: str
+    last_ping: str | None
+    next_ping: str | None
+    manual_resume: bool
+    methods: str
+    subject: str
+    subject_fail: str
+    success_kw: str
+    failure_kw: str
+    filter_subject: bool
+    filter_body: bool
+    last_duration: int
+    unique_key: str
+    ping_url: str
+    update_url: str
+    pause_url: str
+    resume_url: str
+    channels: str
+    timeout: int
+    schedule: str
+    tz: str
 
 
 class Check(models.Model):
@@ -127,13 +159,13 @@ class Check(models.Model):
     def __str__(self):
         return "%s (%d)" % (self.name or self.code, self.id)
 
-    def name_then_code(self):
+    def name_then_code(self) -> str:
         if self.name:
             return self.name
 
         return str(self.code)
 
-    def url(self):
+    def url(self) -> str | None:
         """Return check's ping url in user's preferred style.
 
         Note: this method reads self.project. If project is not loaded already,
@@ -151,37 +183,38 @@ class Check(models.Model):
 
         return settings.PING_ENDPOINT + str(self.code)
 
-    def details_url(self):
+    def details_url(self) -> str:
         return settings.SITE_ROOT + reverse("hc-details", args=[self.code])
 
-    def cloaked_url(self):
+    def cloaked_url(self) -> str:
         return settings.SITE_ROOT + reverse("hc-uncloak", args=[self.unique_key])
 
-    def email(self):
+    def email(self) -> str:
         return "%s@%s" % (self.code, settings.PING_EMAIL_DOMAIN)
 
-    def clamped_last_duration(self):
+    def clamped_last_duration(self) -> td | None:
         if self.last_duration and self.last_duration < MAX_DELTA:
             return self.last_duration
+        return None
 
-    def set_name_slug(self, name):
+    def set_name_slug(self, name: str) -> None:
         self.name = name
         self.slug = slugify(name)
 
-    def get_grace_start(self, with_started=True):
+    def get_grace_start(self, with_started=True) -> datetime | None:
         """Return the datetime when the grace period starts.
 
         If the check is currently new, paused or down, return None.
-
         """
-
         # NEVER is a constant sentinel value (year 3000).
         # Using None instead would make the min() logic clunky.
         result = NEVER
 
         if self.kind == "simple" and self.status == "up":
+            assert self.last_ping is not None
             result = self.last_ping + self.timeout
         elif self.kind == "cron" and self.status == "up":
+            assert self.last_ping is not None
             # The complex case, next ping is expected based on cron schedule.
             # Don't convert to naive datetimes (and so avoid ambiguities around
             # DST transitions). cronsim will handle the timezone-aware datetimes.
@@ -191,24 +224,22 @@ class Check(models.Model):
         if with_started and self.last_start and self.status != "down":
             result = min(result, self.last_start)
 
-        if result != NEVER:
-            return result
+        return result if result != NEVER else None
 
-    def going_down_after(self):
+    def going_down_after(self) -> datetime | None:
         """Return the datetime when the check goes down.
 
         If the check is new or paused, and not currently running, return None.
         If the check is already down, also return None.
-
         """
-
         grace_start = self.get_grace_start()
         if grace_start is not None:
             return grace_start + self.grace
 
-    def get_status(self, with_started=False):
-        """Return current status for display."""
+        return None
 
+    def get_status(self, with_started=False) -> str:
+        """Return current status for display."""
         frozen_now = now()
 
         if self.last_start:
@@ -221,6 +252,7 @@ class Check(models.Model):
             return self.status
 
         grace_start = self.get_grace_start(with_started=with_started)
+        assert grace_start is not None
         grace_end = grace_start + self.grace
         if frozen_now >= grace_end:
             return "down"
@@ -230,17 +262,17 @@ class Check(models.Model):
 
         return "up"
 
-    def assign_all_channels(self):
+    def assign_all_channels(self) -> None:
         channels = Channel.objects.filter(project=self.project)
         self.channel_set.set(channels)
 
-    def tags_list(self):
+    def tags_list(self) -> list[str]:
         return [t.strip() for t in self.tags.split(" ") if t.strip()]
 
-    def matches_tag_set(self, tag_set):
+    def matches_tag_set(self, tag_set: set[str]) -> bool:
         return tag_set.issubset(self.tags_list())
 
-    def channels_str(self):
+    def channels_str(self) -> str:
         """Return a comma-separated string of assigned channel codes."""
 
         # Is this an unsaved instance?
@@ -253,13 +285,12 @@ class Check(models.Model):
         return ",".join(sorted(codes))
 
     @property
-    def unique_key(self):
+    def unique_key(self) -> str:
         code_half = self.code.hex[:16]
         return hashlib.sha1(code_half.encode()).hexdigest()
 
-    def to_dict(self, readonly=False):
-
-        result = {
+    def to_dict(self, readonly=False) -> CheckDict:
+        result: CheckDict = {
             "name": self.name,
             "slug": self.slug,
             "tags": self.tags,
@@ -285,14 +316,14 @@ class Check(models.Model):
         if readonly:
             result["unique_key"] = self.unique_key
         else:
-            update_rel_url = reverse("hc-api-single", args=[self.code])
-            pause_rel_url = reverse("hc-api-pause", args=[self.code])
-            resume_rel_url = reverse("hc-api-resume", args=[self.code])
-
             result["ping_url"] = settings.PING_ENDPOINT + str(self.code)
-            result["update_url"] = settings.SITE_ROOT + update_rel_url
-            result["pause_url"] = settings.SITE_ROOT + pause_rel_url
-            result["resume_url"] = settings.SITE_ROOT + resume_rel_url
+
+            # Optimization: construct API URLs manually instead of using reverse().
+            # This is significantly quicker when returning hundreds of checks.
+            update_url = settings.SITE_ROOT + "/api/v1/checks/" + str(self.code)
+            result["update_url"] = update_url
+            result["pause_url"] = update_url + "/pause"
+            result["resume_url"] = update_url + "/resume"
             result["channels"] = self.channels_str()
 
         if self.kind == "simple":
@@ -303,7 +334,16 @@ class Check(models.Model):
 
         return result
 
-    def ping(self, remote_addr, scheme, method, ua, body, action, exitstatus=None):
+    def ping(
+        self,
+        remote_addr: str,
+        scheme: str,
+        method: str,
+        ua: str,
+        body: bytes,
+        action: str,
+        exitstatus: int | None = None,
+    ) -> None:
         frozen_now = now()
 
         if self.status == "paused" and self.manual_resume:
@@ -358,7 +398,7 @@ class Check(models.Model):
         if self.n_pings % 100 == 0:
             self.prune()
 
-    def prune(self):
+    def prune(self) -> None:
         """Remove old pings and notifications."""
 
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
@@ -381,7 +421,7 @@ class Check(models.Model):
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
         return self.ping_set.filter(n__gt=threshold)
 
-    def downtimes(self, months):
+    def downtimes(self, months: int):
         """Calculate the number of downtimes and downtime minutes per month.
 
         Returns a list of (datetime, downtime_in_secs, number_of_outages) tuples.
@@ -430,7 +470,7 @@ class Check(models.Model):
 
         return self.downtimes(3)[:-1]
 
-    def create_flip(self, new_status, mark_as_processed=False):
+    def create_flip(self, new_status: str, mark_as_processed: bool = False) -> None:
         """Create a Flip object for this check.
 
         Flip objects record check status changes, and have two uses:
@@ -914,6 +954,11 @@ class Channel(models.Model):
     def zulip_to(self):
         assert self.kind == "zulip"
         return self.json["to"]
+
+    @property
+    def zulip_topic(self):
+        assert self.kind == "zulip"
+        return self.json.get("topic", "")
 
     @property
     def linenotify_token(self):

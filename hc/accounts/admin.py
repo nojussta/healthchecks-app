@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.contrib import admin
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.admin import UserAdmin
@@ -8,6 +10,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+
 from hc.accounts.models import Credential, Profile, Project
 
 
@@ -33,8 +36,8 @@ def _format_usage(num_checks, num_channels):
 
 
 class Fieldset:
-    name = None
-    fields = []
+    name = "Group"
+    fields: tuple[str, ...] = tuple()
 
     @classmethod
     def tuple(cls):
